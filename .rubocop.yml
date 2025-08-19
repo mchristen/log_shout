@@ -1,0 +1,73 @@
+require:
+  - standard
+
+inherit_gem:
+  standard: config/base.yml
+
+AllCops:
+  NewCops: enable
+  Exclude:
+    - node_modules/**/*
+    - public/**/*
+    - vendor/**/*
+
+Layout/LineLength:
+  Enabled: true
+  Max: 140  # Set maximum line length to 120 characters
+
+Layout/ArgumentAlignment:
+  Enabled: true
+
+Layout/ArrayAlignment:
+  Enabled: true
+
+Layout/BlockAlignment:
+  Enabled: true
+
+Layout/BlockEndNewline:
+  Enabled: true
+
+Layout/ClosingParenthesisIndentation:
+  Enabled: true
+
+Layout/FirstArgumentIndentation:
+  Enabled: true
+
+Layout/FirstArrayElementIndentation:
+  Enabled: true
+
+Layout/FirstHashElementIndentation:
+  Enabled: true
+
+Layout/FirstParameterIndentation:
+  Enabled: true
+
+Layout/HashAlignment:
+  Enabled: true
+
+Layout/IndentationWidth:
+  Enabled: true
+
+Layout/MultilineArrayLineBreaks:
+  Enabled: true
+
+Layout/MultilineBlockLayout:
+  Enabled: true
+
+Layout/MultilineHashBraceLayout:
+  Enabled: true
+
+Layout/MultilineHashKeyLineBreaks:
+  Enabled: true
+
+Layout/MultilineMethodArgumentLineBreaks:
+  Enabled: true
+
+Layout/MultilineMethodParameterLineBreaks:
+  Enabled: true
+
+Layout/ParameterAlignment:
+  Enabled: true
+
+Style/BlockDelimiters:
+  Enabled: true

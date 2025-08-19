@@ -1,36 +1,25 @@
 {
   description = "A simple ruby app demo";
 
-  nixConfig = {
-    extra-substituters = "https://nixpkgs-ruby.cachix.org";
-    extra-trusted-public-keys = "nixpkgs-ruby.cachix.org-1:vrcdi50fTolOxWCZZkw0jakOnUI1T19oYJ+PRYdK4SM=";
-  };
-
   inputs = {
-    nixpkgs.url = "nixpkgs";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     ruby-nix.url = "github:inscapist/ruby-nix";
-    # a fork that supports platform dependant gem
+    ruby-nix.inputs.nixpkgs.follows = "nixpkgs";
+    # ruby-nix requires this fork for platform-dependent gems.
     bundix = {
       url = "github:inscapist/bundix/main";
-      inputs.nixpkgs.follows = "nixpkgs";
+      flake = false;
     };
     fu.url = "github:numtide/flake-utils";
-    bob-ruby.url = "path:/home/matt/projects/nixpkgs-ruby";
-    bob-ruby.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      nixpkgs-unstable,
-      nixpkgs-master,
       fu,
       ruby-nix,
       bundix,
-      bob-ruby,
     }:
     with fu.lib;
     eachDefaultSystem (
@@ -38,21 +27,9 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ bob-ruby.overlays.default ];
+          config.allowUnfree = true;
         };
         rubyNix = ruby-nix.lib pkgs;
-        pkgsUnstable = import nixpkgs-unstable {
-          inherit system;
-        };
-        pkgsMaster = import nixpkgs-master {
-          inherit system;
-          config = {
-            allowUnfree = true;
-            cudaSupport = true;
-            vulkanSupport = true;
-          };
-        };
-
         # TODO generate gemset.nix with bundix
         gemset = if builtins.pathExists ./gemset.nix then import ./gemset.nix else { };
 
@@ -60,11 +37,15 @@
         #   https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/ruby-modules/gem-config/default.nix
         gemConfig = { };
 
-        # See available versions here: https://github.com/bobvanderlinden/nixpkgs-ruby/blob/master/ruby/versions.json
-        ruby = pkgs."ruby-nightly";
+        # Ruby 4.0 includes the Ractor::Port API previously used from nightly.
+        ruby = pkgs.ruby_4_0;
 
         # Running bundix would regenerate `gemset.nix`
-        bundixcli = bundix.packages.${system}.default;
+        # Build the fork with our Ruby; its flake hardcodes an older Ruby.
+        bundixcli = pkgs.callPackage "${bundix}/default.nix" {
+          inherit pkgs ruby;
+          bundler = pkgs.bundler.override { inherit ruby; };
+        };
 
         # Use these instead of the original `bundle <mutate>` commands
         bundleLock = pkgs.writeShellScriptBin "bundle-lock" ''
@@ -114,13 +95,13 @@
               at-spi2-atk
               cups
               libdrm
-              xorg.libXcomposite
-              xorg.libXdamage
-              xorg.libXfixes
-              xorg.libXrandr
+              libxcomposite
+              libxdamage
+              libxfixes
+              libxrandr
               mesa
               alsa-lib
-              pkgsMaster.claude-code
+              claude-code
               watchman
               llama-cpp
             ]);

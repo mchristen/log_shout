@@ -1,0 +1,38 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (for example v0.1.0)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler: '2.7.2'
+          bundler-cache: true
+      - name: Verify version tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          ruby -Ilib -rlog_shout/version -e 'abort "Tag does not match gem version" unless ENV.fetch("RELEASE_TAG") == "v#{LogShout::VERSION}"'
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+      - run: bundle exec rake
+      - run: ruby script/check_package.rb
+      - uses: rubygems/release-gem@v1

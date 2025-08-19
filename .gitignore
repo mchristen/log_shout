@@ -17,3 +17,5 @@ test/test_files
 .yarn/
 node_modules/
 *.log
+
+/pkg/
