@@ -1,0 +1,19 @@
+# Ignore bundler config
+/.bundle
+/vendor/
+# Ignore the .gem files
+*.gem
+# Ignore local environment files
+*.swp
+*.swo
+.DS_Store
+.direnv
+
+*.db
+.aider*
+.env
+test/test_files
+/tmp/
+.yarn/
+node_modules/
+*.log

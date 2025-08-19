@@ -1,0 +1,1 @@
+require "log_shout/version"

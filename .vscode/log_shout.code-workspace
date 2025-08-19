@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": ".."
+    }
+  ],
+  "settings": {
+    "[ruby]": {
+      "editor.defaultFormatter": "Shopify.ruby-lsp"
+    },
+    "rubyLsp.customRubyCommand": "nix develop",
+    "rubyLsp.formatter": "rubocop_internal",
+    "rubyLsp.linters": ["rubocop_internal"],
+    "rubyLsp.addonSettings": {},
+    "rubyLsp.featureFlags": { "fullTestDiscovery": true }
+  }
+}
