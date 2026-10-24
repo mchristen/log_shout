@@ -151,6 +151,12 @@ currently no backpressure, rotation, retry, or delivery guarantee after failure.
 Destinations are opened during configuration. If opening or writing fails,
 `Ractor::RemoteError` is raised by initialization or the next synchronous
 `flush`, `read`, or `close`; its `cause` contains the underlying IO exception.
+When several destinations fail during a write, flush, or shutdown,
+`LogShout::HandlerErrors` contains every original exception in its `errors`
+array. Its message includes every failure and its underlying cause. A single
+failure still raises the original exception directly. Ruby Logger may catch
+write exceptions and print their messages; call `LogShout.flush` explicitly
+to handle worker failures in application code.
 A failed worker wakes waiting callers. A live worker blocked in operating-system
 IO can still block a flush or shutdown; no IO timeout is imposed. Ruby Logger
 may report immediate write errors to stderr instead of propagating them, so use
@@ -165,9 +171,13 @@ application exception. For reliable delivery, explicitly stop producers and call
 `LogShout.configure(path: ...)` validates and opens the replacement destinations,
 drains and closes the previous handlers, and clears the logger cache. Invalid
 configuration or an opening failure preserves the current configuration.
+If an old worker has failed, reconfiguration reports its error to stderr and
+installs the healthy replacement configuration. Writes and flushes attempt every
+destination before reporting all failures, so a failed destination does
+not prevent delivery to the remaining destinations.
 `LogShout.reset!` closes handlers and clears configuration; the next `get_logger`
-loads configuration again. Stop and join background jobs before reconfiguring,
-resetting, or closing. Discard old logger references and fetch fresh ones after
+or `LoggingRactor.start` loads configuration again. Stop and join background jobs
+before reconfiguring, resetting, or closing. Discard old logger references and fetch fresh ones after
 reconfiguration. Configuration changes are intended for the main Ractor while
 producers are stopped; concurrent reconfiguration is unsupported.
 

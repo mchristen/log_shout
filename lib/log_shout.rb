@@ -15,6 +15,25 @@ require "log_shout/formatters/default"
 module LogShout
   class LogShoutError < StandardError; end
 
+  class HandlerErrors < LogShoutError
+    attr_reader :errors
+
+    def initialize(errors)
+      @errors = errors.flat_map { |error| error.is_a?(HandlerErrors) ? error.errors : [error] }.freeze
+      details = @errors.map do |error|
+        detail = "#{error.class}: #{error.message}"
+        detail += " (#{error.cause.class}: #{error.cause.message})" if error.cause
+        detail
+      end
+      super("#{@errors.length} handler failures: #{details.join("; ")}")
+    end
+
+    def self.raise_if_any(errors)
+      raise errors.first if errors.length == 1
+      raise new(errors) unless errors.empty?
+    end
+  end
+
   # Replace the Sorbet enum with a plain Ruby value-object enum
   class LogDestination
     attr_reader :name
@@ -144,9 +163,17 @@ module LogShout
     handlers = build_handlers(validated_config)
     begin
       close_handlers
-    rescue
-      handlers.each_value(&:close)
-      raise
+    rescue => e
+      errors = e.is_a?(HandlerErrors) ? e.errors : [e]
+      if errors.all? { |error| error.is_a?(Ractor::RemoteError) }
+        # Every old destination has been closed; report each failed worker.
+        errors.each do |error|
+          warn "LogShout replaced failed handlers: #{error.cause.class}: #{error.cause.message}"
+        end
+      else
+        handlers.each_value(&:close)
+        raise
+      end
     end
     @config_file_path = config_file_path
     @validated_config = validated_config
@@ -183,6 +210,7 @@ module LogShout
     default_handler_names = config.fetch(:defaultHandlers, ["stdout"])
     raise LogShoutError, "defaultHandlers must be an array" unless default_handler_names.is_a?(Array)
     extra_handlers = config.fetch(:extraHandlers, {}).each_with_object({}) do |(name, config), obj|
+      name = configuration_name(name, "handler")
       if name === :stdout || name === :stderr
         raise LogShoutError, "Cannot override built-in handler: #{name}"
       end
@@ -205,17 +233,20 @@ module LogShout
       obj[name.to_sym] = handler
     end
     default_handlers = default_handler_names.map do |name|
-      BUILTIN_HANDLERS[name.to_sym] || extra_handlers[name.to_sym] || (raise LogShoutError, "Unknown handler: #{name}")
+      name = configuration_name(name, "handler")
+      BUILTIN_HANDLERS[name] || extra_handlers[name] || (raise LogShoutError, "Unknown handler: #{name}")
     end
 
     loggers = config.fetch(:loggers, {}).each_with_object({}) do |(name, config), obj|
+      name = configuration_name(name, "logger")
       raise LogShoutError, "Logger #{name} must be a mapping" unless config.is_a?(Hash)
       level = config.fetch(:level, default_level)
       validate_level(level)
       handler_names = config.fetch(:handlers, default_handler_names)
       raise LogShoutError, "Logger #{name} handlers must be an array" unless handler_names.is_a?(Array)
       handlers = handler_names.map do |name|
-        BUILTIN_HANDLERS[name.to_sym] || extra_handlers[name.to_sym] || (raise LogShoutError, "Unknown handler: #{name}")
+        name = configuration_name(name, "handler")
+        BUILTIN_HANDLERS[name] || extra_handlers[name] || (raise LogShoutError, "Unknown handler: #{name}")
       end
       obj[name.to_sym] = LogConfig.new(level: level, handlers: handlers)
     end
@@ -235,11 +266,20 @@ module LogShout
   end
   private_class_method :validate_level
 
+  def self.configuration_name(name, kind)
+    unless name.is_a?(String) || name.is_a?(Symbol)
+      raise LogShoutError, "Invalid #{kind} name: #{name.inspect}; expected a string or symbol"
+    end
+    name.to_sym
+  end
+  private_class_method :configuration_name
+
   def self.get_handler(name)
     @handlers[name]
   end
 
   def self.get_handlers_for(logger_name)
+    configure unless @handlers
     config = configuration[:loggers].fetch(
       logger_name.to_sym,
       {
@@ -254,19 +294,17 @@ module LogShout
 
   def self.flush
     return unless @handlers
-    @handlers.each_value do |handler|
-      handler.flush
-    end
+    MultiIO.new(@handlers.values).flush
   end
 
   def self.close_handlers
-    error = nil
+    errors = []
     (@handlers || {}).each_value do |handler|
       handler.close
     rescue => e
-      error ||= e
+      errors << e
     end
-    raise error if error
+    HandlerErrors.raise_if_any(errors)
     nil
   end
 

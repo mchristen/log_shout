@@ -7,7 +7,7 @@ module LogShout
     end
 
     def write(message)
-      @targets.each { |t| t.write(message) }
+      each_target { |target| target.write(message) }
       nil
     end
 
@@ -18,8 +18,8 @@ module LogShout
     end
 
     def flush(wait_for_flush = true)
-      @targets.each do |t|
-        t.flush(wait_for_flush)
+      each_target do |target|
+        target.flush(wait_for_flush)
       end
       nil
     end
@@ -31,6 +31,19 @@ module LogShout
         return t.read
       end
       nil
+    end
+
+    private
+
+    # Report failures after giving every destination a chance to process the call.
+    def each_target
+      errors = []
+      @targets.each do |target|
+        yield target
+      rescue => e
+        errors << e
+      end
+      HandlerErrors.raise_if_any(errors)
     end
   end
 end

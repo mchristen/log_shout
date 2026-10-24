@@ -8,7 +8,7 @@ module LogShout
       handlers = LogShout.get_handlers_for(name).freeze
       level = ::Logger.const_get(LogShout.get_level_for_name(name).upcase)
       logdev = LogShout::MultiIO.new(handlers)
-      r = Ractor.new(level, logdev, args, name: name) do |level, logdev, a|
+      r = Ractor.new(level, logdev, args, name: name.to_s) do |level, logdev, a|
         logger = ::Logger.new(logdev,
           level: level,
           progname: Ractor.current.name,
