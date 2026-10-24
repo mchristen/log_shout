@@ -20,6 +20,7 @@ module LogShout
     def test_ractor_smoke
       r = LoggingRactor.start(target: LoggingRactorTestJob, name: "test_logger", args: [42])
       assert r.value
+      LogShout.flush
       assert_log_output "Hello from Ractor with args: 42"
       refute_log_output "Hello from Debug Ractor with args: 42"
     end
